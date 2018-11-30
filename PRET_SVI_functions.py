@@ -308,4 +308,5 @@ def _fit_single_document_convergeCheck(self, doc_x, doc_y, doc_z, doc_x_old, doc
             converge = False
         return doc_x, doc_y, doc_z, converge, diff_total
 
+>>>>>>> d2e1c29e6be1cdffac1b508b12d378357d05217e
 """

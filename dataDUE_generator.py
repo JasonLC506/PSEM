@@ -55,7 +55,7 @@ class dataDUELoader(object):
 
         self.data_reader.start()                    # !!! start when instantiated !!!
 
-    def _dataBatchReader(self, data_queue, timeout=10000):
+    def _dataBatchReader(self, data_queue, timeout=100000):
         while True:
             file_list = os.listdir(self.batch_data_dir)
             cnt = 0

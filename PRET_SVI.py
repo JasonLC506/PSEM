@@ -160,7 +160,10 @@ class PRET_SVI(object):
 
         self._log("before training, ppl: %s" % str(ppl_initial))
         ppl_best = ppl_initial                                  # keep the best ppl only in none parallel ppl way
-
+        
+        if batch_size >= self.D_train:
+            batch_size = self.D_train
+            self._log("full batch, batch_size set to D_train %d" % self.D_train)
 
         for epoch in range(self.epoch_init, max_iter):
             self._fit_single_epoch(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch, batch_size=batch_size)
@@ -226,7 +229,7 @@ class PRET_SVI(object):
         self.gamma = gamma
         self.delta = delta
         self.zeta = zeta
-        print "set up hyperparameters: alpha=%f, beta=%f, gamma=%f, delta=%f, zeta=%f" % (self.alpha, self.beta, self.gamma, self.delta, self.zeta)
+        self._log("set up hyperparameters: alpha=%f, beta=%f, gamma=%f, delta=%f, zeta=%f" % (self.alpha, self.beta, self.gamma, self.delta, self.zeta))
 
     # """ copied from ETM """
     # def _matrix2corpus(self, dataW):
@@ -262,7 +265,7 @@ class PRET_SVI(object):
         self.phiB.initialize(shape=[self.V], seed=self.beta)
         self.phiT.initialize(shape=[self.K, self.V], seed=self.beta)
         self.psi.initialize(shape=[self.U, self.G], seed=self.zeta)
-        self.eta.initialize(shape=[self.K, self.G, self.E], seed=self.gamma, additional_noise_axis=None)
+        self.eta.initialize(shape=[self.K, self.G, self.E], seed=self.gamma, additional_noise_axis=1)
 
         duration = (datetime.now() - start).total_seconds()
         print "_initialize takes %fs" % duration
@@ -285,10 +288,11 @@ class PRET_SVI(object):
         start = datetime.now()
 
         # uniformly sampling all documents once #
-        pbar = tqdm(dataDUE.batchGenerate(batch_size=batch_size, keep_complete=True),
-                    total = math.ceil(self.D_train * 1.0 / batch_size),
-                    desc = '({0:^3})'.format(epoch))
-        for i_batch, batch_size_real, data_batched in pbar:
+        #pbar = tqdm(dataDUE.batchGenerate(batch_size=batch_size, keep_complete=True),
+        #            total = math.ceil(self.D_train * 1.0 / batch_size),
+        #            desc = '({0:^3})'.format(epoch))
+        #for i_batch, batch_size_real, data_batched in pbar:
+        for i_batch, batch_size_real, data_batched in dataDUE.batchGenerate(batch_size=batch_size, keep_complete=True):
             var_temp = self._fit_batchIntermediateInitialize()
 
             pars_topass = self._fit_single_epoch_pars_topass()

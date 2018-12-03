@@ -14,15 +14,10 @@ import numpy as np
 from datetime import datetime
 from tqdm import tqdm
 import cPickle
-import math
-from multiprocessing import Pool, Process
-import warnings
-from copy import copy
-import itertools
 
-from dataDUE_generator import dataDUELoader
 from functions import EDirLog, probNormalize, probNormalizeLog, expConstantIgnore
 from PRET_SVI_functions import _fit_single_document
+from evaluate import evaluate
 
 np.seterr(divide='raise', over='raise')
 
@@ -128,7 +123,6 @@ class PRET_SVI(object):
 
         self._setHyperparameters(alpha, beta, gamma, delta, zeta)
 
-
         self.lr = {"tau": lr_tau, "kappa": lr_kappa, "init": lr_init}
         self.converge_threshold_inner = converge_threshold_inner            # inner iteration for each document
 
@@ -146,20 +140,13 @@ class PRET_SVI(object):
         # self.pool = Pool(processes=N_workers)
 
         self._estimateGlobal()
-        if dataDUE_valid_on_shell is None:
-            ppl_on_shell = [None, None, None]
-        else:
-            ppl_on_shell = self._ppl(dataDUE_valid_on_shell, epoch=-1, on_shell=True)
+        ppl_initial, perf_initial = self.validate(
+            dataDUE_valid_off_shell=dataDUE_valid_off_shell,
+            dataDUE_valid_on_shell=dataDUE_valid_on_shell
+        )
 
-        if dataDUE_valid_off_shell is None:
-            ppl_off_shell = [None, None, None]
-        else:
-            ppl_off_shell = self._ppl(dataDUE_valid_off_shell, epoch=-1, on_shell=False)
-
-        ppl_initial = ppl_on_shell + ppl_off_shell
-
-        self._log("before training, ppl: %s" % str(ppl_initial))
-        ppl_best = ppl_initial                                  # keep the best ppl only in none parallel ppl way
+        self._log("before training, ppl: %s\nperf: %s\n" % (str(ppl_initial), str(perf_initial)))
+        perf_best = perf_initial
         
         if batch_size >= self.D_train:
             batch_size = self.D_train
@@ -168,28 +155,47 @@ class PRET_SVI(object):
         for epoch in range(self.epoch_init, max_iter):
             self._fit_single_epoch(dataDUE=dataDUE, dataW=dataW, dataToken=dataToken, epoch=epoch, batch_size=batch_size)
             self._estimateGlobal()
-            if dataDUE_valid_on_shell is None:
-                ppl_on_shell = [None, None, None]
-            else:
-                ppl_on_shell = self._ppl(dataDUE_valid_on_shell, epoch=epoch, on_shell=True)
-            if dataDUE_valid_off_shell is None:
-                ppl_off_shell = [None, None, None]
-            else:
-                ppl_off_shell = self._ppl(dataDUE_valid_off_shell, epoch=epoch, on_shell=False)
-            ppl = ppl_on_shell + ppl_off_shell
+            ppl, perf = self.validate(
+                dataDUE_valid_off_shell=dataDUE_valid_off_shell,
+                dataDUE_valid_on_shell=dataDUE_valid_on_shell,
+                epoch=epoch
+            )
 
             ### test ###
             ppl_off_shell_for_on_shell = self._ppl(dataDUE_valid_on_shell, epoch, on_shell=False)
             print "epoch: %d, ppl: %s" % (epoch, str(ppl))
             print "ppl_off_shell for on_shell", str(ppl_off_shell_for_on_shell)
 
-            ppl_best, best_flag = self._ppl_compare(ppl_best, ppl)
-            self._log("epoch: %d, ppl: %s" % (epoch, str(ppl)))
-            self._saveCheckPoint(epoch, ppl)
+            ppl_best, best_flag = self._ppl_compare(perf_best, perf)
+            self._log("epoch: %d, ppl: %s\nperf: %s\n" % (epoch, str(ppl), str(perf)))
+            self._saveCheckPoint(epoch, ppl=ppl, perf=perf)
             for i in range(len(best_flag)):
                 if best_flag[i]:
-                    self._saveCheckPoint(epoch=epoch, ppl=ppl, filename=self.checkpoint_file + "_best_ppl[%d]" % i)
+                    self._saveCheckPoint(
+                        epoch=epoch,
+                        ppl=ppl,
+                        perf=perf,
+                        filename=self.checkpoint_file + "_epoch_%03d" % epoch
+                    )
+                    break
 
+    def validate(self, dataDUE_valid_on_shell, dataDUE_valid_off_shell, epoch=-1):
+        if dataDUE_valid_on_shell is None:
+            ppl_on_shell = [None, None, None]
+            perf_on_shell = [None]
+        else:
+            ppl_on_shell = self._ppl(dataDUE_valid_on_shell, epoch=epoch, on_shell=True)
+            preds, trues = self.predict(dataDUE_valid_on_shell, on_shell=True)
+            perf_on_shell = evaluate(preds=preds, trues=trues)
+
+        if dataDUE_valid_off_shell is None:
+            ppl_off_shell = [None, None, None]
+            perf_off_shell = [None]
+        else:
+            ppl_off_shell = self._ppl(dataDUE_valid_off_shell, epoch=epoch, on_shell=False)
+            preds, trues = self.predict(dataDUE_valid_off_shell, on_shell=False)
+            perf_off_shell = evaluate(preds=preds, trues=trues)
+        return ppl_on_shell + ppl_off_shell, perf_on_shell + perf_off_shell
 
     def _ppl_compare(self, ppl_best, ppl):
         N_ppl = len(ppl)
@@ -199,7 +205,7 @@ class PRET_SVI(object):
             if ppl_best[i] is None:
                 # no such valid data to calculate #
                 continue
-            if ppl_best[i] > ppl[i]:
+            if ppl_best[i] < ppl[i]:
                 new_best[i] = ppl[i]
                 best_flag[i] = True
         return new_best, best_flag
@@ -545,7 +551,7 @@ class PRET_SVI(object):
     def _lrCal(self, epoch):
         return float(self.lr["init"] * np.power((self.lr["tau"] + epoch), - self.lr["kappa"]))
 
-    def _saveCheckPoint(self, epoch, ppl = None, filename = None):
+    def _saveCheckPoint(self, epoch, ppl=None, perf=None, filename=None):
         start = datetime.now()
 
         if filename is None:
@@ -566,9 +572,10 @@ class PRET_SVI(object):
             # "y": self.y,
             # "x": self.x,
             "epoch": epoch,
-            "ppl": ppl
+            "ppl": ppl,
+            "perf": perf
         }
-        with open(filename, "w") as f_ckpt:
+        with open(filename, "wb") as f_ckpt:
             cPickle.dump(state, f_ckpt)
 
         duration = datetime.now() - start
@@ -579,7 +586,7 @@ class PRET_SVI(object):
 
         if filename is None:
             filename = self.checkpoint_file
-        state = cPickle.load(open(filename, "r"))
+        state = cPickle.load(open(filename, "rb"))
         # restore #
         self.theta.initialize(new_data=state["theta"])
         self.pi.initialize(new_data=state["pi"])
@@ -608,6 +615,7 @@ class PRET_SVI(object):
     def _log(self, string):
         with open(self.log_file, "a") as logf:
             logf.write(string.rstrip("\n") + "\n")
+
 
 if __name__ == "__main__":
     model = PRET_SVI(2,1)

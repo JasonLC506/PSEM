@@ -20,4 +20,4 @@ def evaluate(preds, trues):
     # auc_pr_micro = roc_auc_score(y_true=trues_onehot, y_score=preds, average='micro')
     # auc_pr_macro = roc_auc_score(y_true=trues_onehot, y_score=preds, average='macro')
 
-    return [log_ppl, accuracy, auc_pr_micro, auc_pr_macro]
+    return [-log_ppl, accuracy, auc_pr_micro, auc_pr_macro]

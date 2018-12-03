@@ -2,11 +2,12 @@ import numpy as np
 import cPickle
 from matplotlib import pyplot as plt
 import sys
+import os
 
 ## models ##
-from PRET import PRET
+# from PRET import PRET
 from PRET_SVI import PRET_SVI
-
+from evaluate import evaluate
 from dataDUE_generator import dataDUELoader
 
 EMOTICON_LIST = ["LIKE", "LOVE", "SAD", "WOW", "HAHA", "ANGRY"]
@@ -71,6 +72,10 @@ meta_data_on_test_file = data_dir + "meta_data_on_shell_test"
 
 log_dir = "log/" + data_name + "/"
 ckpt_dir = "ckpt/" + data_name + "/"
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
+if not os.path.exists(ckpt_dir):
+    os.makedirs(ckpt_dir)
 
 
 def training(dataW, batch_rBp_dir, batch_valid_on_shell_dir=None, batch_valid_off_shell_dir=None, dataToken=None,
@@ -233,9 +238,9 @@ if __name__ == "__main__":
              resume=None)
 #             resume = "ckpt/CNN/PRET_SVI_K50_G16_batch_size_23000_lr_kappa_0.000000_beta_%f_gamma_%f_zeta_0.100000" % (beta, gamma))
 
-    testing(Model=PRET_SVI, hyperparameters=[K, G],
-            resume="ckpt/" + data_name + "/PRET_SVI_K50_G1_batch_size_23000_lr_kappa_0.000000_beta_0.010000_gamma_100.000000_zeta_0.100000_best_ppl[4]",
-            dataToken=dataToken, id_map_reverse=id_map_reverse,
-            batch_test_on_shell_dir=batch_test_on_shell_dir, meta_data_on_test_file=meta_data_on_test_file,
-            batch_test_off_shell_dir=batch_test_off_shell_dir, meta_data_off_test_file=meta_data_off_test_file)
+    # testing(Model=PRET_SVI, hyperparameters=[K, G],
+    #         resume="ckpt/" + data_name + "/PRET_SVI_K10_G5_batch_size_27239_lr_kappa_0.000000_beta_0.010000_gamma_100.000000_zeta_0.100000_epoch_001",
+    #         dataToken=dataToken, id_map_reverse=id_map_reverse,
+    #         batch_test_on_shell_dir=batch_test_on_shell_dir, meta_data_on_test_file=meta_data_on_test_file,
+    #         batch_test_off_shell_dir=batch_test_off_shell_dir, meta_data_off_test_file=meta_data_off_test_file)
 

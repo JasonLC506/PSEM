@@ -160,24 +160,24 @@ class PRET_SVI(object):
                 dataDUE_valid_on_shell=dataDUE_valid_on_shell,
                 epoch=epoch
             )
-
+            print("epoch: %d, ppl: %s\nperf: %s\n" % (epoch, str(ppl), str(perf)))
             ### test ###
-            ppl_off_shell_for_on_shell = self._ppl(dataDUE_valid_on_shell, epoch, on_shell=False)
-            print "epoch: %d, ppl: %s" % (epoch, str(ppl))
-            print "ppl_off_shell for on_shell", str(ppl_off_shell_for_on_shell)
+            # ppl_off_shell_for_on_shell = self._ppl(dataDUE_valid_on_shell, epoch, on_shell=False)
+            # print "ppl_off_shell for on_shell", str(ppl_off_shell_for_on_shell)
 
             ppl_best, best_flag = self._ppl_compare(perf_best, perf)
             self._log("epoch: %d, ppl: %s\nperf: %s\n" % (epoch, str(ppl), str(perf)))
             self._saveCheckPoint(epoch, ppl=ppl, perf=perf)
             for i in range(len(best_flag)):
+                if i not in [0, 2, 4, 6]:             # auc-pr micro
+                    continue
                 if best_flag[i]:
                     self._saveCheckPoint(
                         epoch=epoch,
                         ppl=ppl,
                         perf=perf,
-                        filename=self.checkpoint_file + "_epoch_%03d" % epoch
+                        filename=self.checkpoint_file + "_best_[%d]" % i
                     )
-                    break
 
     def validate(self, dataDUE_valid_on_shell, dataDUE_valid_off_shell, epoch=-1):
         if dataDUE_valid_on_shell is None:

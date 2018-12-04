@@ -239,7 +239,7 @@ if __name__ == "__main__":
 #             resume = "ckpt/CNN/PRET_SVI_K50_G16_batch_size_23000_lr_kappa_0.000000_beta_%f_gamma_%f_zeta_0.100000" % (beta, gamma))
 
     # testing(Model=PRET_SVI, hyperparameters=[K, G],
-    #         resume="ckpt/" + data_name + "/PRET_SVI_K10_G5_batch_size_27239_lr_kappa_0.000000_beta_0.010000_gamma_100.000000_zeta_0.100000_epoch_001",
+    #         resume="ckpt/period_foxnews_nolike/PRET_SVI_K50_G16_batch_size_23000_lr_kappa_0.000000_beta_0.010000_gamma_100.000000_zeta_0.100000_epoch_017",
     #         dataToken=dataToken, id_map_reverse=id_map_reverse,
     #         batch_test_on_shell_dir=batch_test_on_shell_dir, meta_data_on_test_file=meta_data_on_test_file,
     #         batch_test_off_shell_dir=batch_test_off_shell_dir, meta_data_off_test_file=meta_data_off_test_file)

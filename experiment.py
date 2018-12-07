@@ -116,25 +116,51 @@ def training(dataW, batch_rBp_dir, batch_valid_on_shell_dir=None, batch_valid_of
 def testing(Model=PRET_SVI, hyperparameters=[], resume=None, dataDUE_loader=dataDUELoader,
             dataToken=None, id_map_reverse=id_map_reverse,
             batch_test_on_shell_dir=None, meta_data_on_test_file=None,
-            batch_test_off_shell_dir=None, meta_data_off_test_file=None,):
-    if batch_test_on_shell_dir is not None:
-        dataDUE_test_on_shell = dataDUE_loader(meta_data_file=meta_data_on_test_file, batch_data_dir=batch_test_on_shell_dir, dataToken=dataToken, id_map=id_map_reverse,
-                                                random_shuffle=False)
-    else:
-        dataDUE_test_on_shell = None
-    if batch_test_off_shell_dir is not None:
-        dataDUE_test_off_shell = dataDUE_loader(meta_data_file=meta_data_off_test_file, batch_data_dir=batch_test_off_shell_dir, dataToken=dataToken, id_map=id_map_reverse,
-                                                 random_shuffle=False)
-    else:
-        dataDUE_test_off_shell = None
+            batch_test_off_shell_dir=None, meta_data_off_test_file=None, ec_sets=None):
 
     K, G = hyperparameters
     model = Model(K, G)
     model._restoreCheckPoint(resume)
 
-    result = performance(model=model, dataDUE_test_off_shell=dataDUE_test_off_shell, dataDUE_test_on_shell=dataDUE_test_on_shell)
-    print result
-    return result
+    results = []
+
+    for id_map_reverse_filtered in id_map_filter_ec_sets(id_map=id_map_reverse, ec_sets=ec_sets):
+        if batch_test_on_shell_dir is not None:
+            dataDUE_test_on_shell = dataDUE_loader(meta_data_file=meta_data_on_test_file, batch_data_dir=batch_test_on_shell_dir, dataToken=dataToken, id_map=id_map_reverse_filtered,
+                                                    random_shuffle=False)
+        else:
+            dataDUE_test_on_shell = None
+        if batch_test_off_shell_dir is not None:
+            dataDUE_test_off_shell = dataDUE_loader(meta_data_file=meta_data_off_test_file, batch_data_dir=batch_test_off_shell_dir, dataToken=dataToken, id_map=id_map_reverse,
+                                                     random_shuffle=False)
+        else:
+            dataDUE_test_off_shell = None
+
+        result = performance(model=model, dataDUE_test_off_shell=dataDUE_test_off_shell, dataDUE_test_on_shell=dataDUE_test_on_shell)
+        print result
+        results.append(result)
+    return results
+
+
+def id_map_filter_ec_sets(id_map, ec_sets):
+    """
+    :param id_map: from post_id to doc_id
+    :param ec_sets:
+    :return:
+    """
+    if ec_sets is None:
+        return [id_map]
+    current_ec_set = set()
+    id_maps = []
+    for i in range(len(ec_sets)):
+        ec_set = set([ec[0] for ec in ec_sets[i]])
+        current_ec_set = current_ec_set.union(ec_set)
+        id_map_new = dict()
+        for id in id_map:
+            if id_map[id] in current_ec_set:
+                id_map_new[id] = id_map[id]
+        id_maps.append(id_map_new)
+    return id_maps
 
 
 def performance(model, dataDUE_test_off_shell=None, dataDUE_test_on_shell=None):
@@ -142,7 +168,10 @@ def performance(model, dataDUE_test_off_shell=None, dataDUE_test_on_shell=None):
     result_off_shell = None
     if dataDUE_test_on_shell is not None:
         preds, trues = model.predict(dataDUE_test_on_shell, on_shell=True)
-        result_on_shell = evaluate(preds, trues)
+        if len(trues) == 0:
+            result_on_shell = [None, None, None, None]
+        else:
+            result_on_shell = evaluate(preds, trues)
     if dataDUE_test_off_shell is not None:
         preds, trues = model.predict(dataDUE_test_off_shell, on_shell=False)
         result_off_shell = evaluate(preds, trues)
@@ -238,9 +267,14 @@ if __name__ == "__main__":
              resume=None)
 #             resume = "ckpt/CNN/PRET_SVI_K50_G16_batch_size_23000_lr_kappa_0.000000_beta_%f_gamma_%f_zeta_0.100000" % (beta, gamma))
 
-    # testing(Model=PRET_SVI, hyperparameters=[K, G],
-    #         resume="ckpt/period_foxnews_nolike/PRET_SVI_K50_G16_batch_size_23000_lr_kappa_0.000000_beta_0.010000_gamma_100.000000_zeta_0.100000_epoch_017",
+    # ec_sets = cPickle.load(open("result/%s_train_posts_divide" % data_name, 'rb'))
+    # print(list(map(lambda x: len(x), id_map_filter_ec_sets(id_map=id_map_reverse, ec_sets=ec_sets))))
+    # results = testing(Model=PRET_SVI, hyperparameters=[K, G],
+    #         resume="ckpt/CNN_nolike/PRET_SVI_K50_G16_batch_size_23000_lr_kappa_0.000000_beta_1.000000_gamma_1.000000_zeta_0.100000_best_[2]",
     #         dataToken=dataToken, id_map_reverse=id_map_reverse,
     #         batch_test_on_shell_dir=batch_test_on_shell_dir, meta_data_on_test_file=meta_data_on_test_file,
-    #         batch_test_off_shell_dir=batch_test_off_shell_dir, meta_data_off_test_file=meta_data_off_test_file)
+    #         batch_test_off_shell_dir=batch_test_off_shell_dir, meta_data_off_test_file=meta_data_off_test_file,
+    #         ec_sets=ec_sets)
+    # print(list(map(lambda x: x[0][2], results)))
+
 

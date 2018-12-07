@@ -25,7 +25,7 @@ class dataDUELoader(object):
             self.Md = meta_data["Md"]
             self.Nd = meta_data["Nd"]
             self.V = meta_data["V"]
-            self.D_current_data = meta_data["D_current_data"]
+            self.D_current_data = min(meta_data["D_current_data"], len(id_map))
             ## with CNN_only data ##
             # self.Md = [0 for i in range(self.D)]
             # for pid in meta_data["Md"]:
